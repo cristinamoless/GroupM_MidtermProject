@@ -2,16 +2,10 @@
 #include "ofApp.h"
 
 //========================================================================
-int main( ){
+int main() {
+    // Resolució de 1280 x 720
+    ofSetupOpenGL(1280, 720, OF_WINDOW);
 
-	//Use ofGLFWWindowSettings for more options like multi-monitor fullscreen
-	ofGLWindowSettings settings;
-	settings.setSize(1024, 768);
-	settings.windowMode = OF_WINDOW; //can also be OF_FULLSCREEN
-
-	auto window = ofCreateWindow(settings);
-
-	ofRunApp(window, std::make_shared<ofApp>());
-	ofRunMainLoop();
-
+    // Executa l'aplicació
+    ofRunApp(new ofApp());
 }
