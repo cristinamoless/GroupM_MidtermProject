@@ -1066,18 +1066,16 @@ void ofApp::drawScene4(float time) {
     float blockStart = creditsStart;
 
     if (localTime < 5.0f) {
-        line1 = "UN PROJECTE DE PROGRAMACIÓ CREATIVA";
-        line2 = "PRESENTAT PEL GRUP M";
+        line1 = "GENERATIVE AUDIOVISUAL";
+        line2 = "M GROUP";
     }
     else if (localTime < 10.0f) {
         blockStart += 5.0f;
-        line1 = "MEMBRE 1";
-        line2 = "MEMBRE 2";
+        line1 = "Cristina Moles";
     }
     else {
         blockStart += 10.0f;
-        line1 = "MEMBRE 3";
-        line2 = "MEMBRE 4";
+        line1 = "Aura Espi";
     }
 
     const float opacity = fade(
@@ -1162,7 +1160,7 @@ void ofApp::drawScene5(float time) {
     ofSetColor(255, 204, 0, opacity * 255.0f);
 
     drawCenteredText(
-        "EL DESPERTAR ESTEL·LAR",
+        "THE STAR AWAKENING",
         0.0f, 0.0f,
         titleFont,
         ofGetWidth() * 0.78f
