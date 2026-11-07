@@ -3,19 +3,21 @@
 #include "ofMain.h"
 #include <array>
 #include <atomic>
-#include <cstdint>
 #include <string>
 #include <vector>
 
 class Star {
 public:
     void setup(float width, float height, float depth);
+
     void update(float speed, float dt,
         float width, float height, float depth);
+
     void draw(float trails, float alpha);
 
 private:
     ofVec3f pos;
+
     float previousZ = 800.0f;
     float maxDepth = 800.0f;
     float brightness = 255.0f;
@@ -36,21 +38,24 @@ private:
     float radius = 1.0f;
 };
 
-// Initialized before the audio stream starts.
+// Initialized before audio starts and unchanged afterwards.
 struct Ship {
     float travel = 4.0f;
     float pause = 2.0f;
     float offset = 0.0f;
+
     float height = 0.5f;
     float slope = 0.0f;
     float trail = 40.0f;
+
     float pitch = 1200.0f;
     float soundDuration = 0.25f;
+
     bool movesRight = true;
 };
 
-// Modified only by the audio callback after setup.
-struct SoundVoice {
+// Only the audio callback modifies active voices.
+struct LaserVoice {
     bool active = false;
     double phase = 0.0;
     double age = 0.0;
@@ -62,6 +67,7 @@ public:
     void update() override;
     void draw() override;
     void exit() override;
+
     void audioOut(ofSoundBuffer& buffer) override;
 
 private:
@@ -74,13 +80,13 @@ private:
     const float creditsStart = 65.0f;
     const float titleStart = 80.0f;
     const float duration = 95.0f;
+
     const float starDepth = 800.0f;
 
     // Audio balance.
     const float musicVolume = 0.40f;
     const double laserVolume = 0.12;
-    const double swingVolume = 0.24;
-    const double impactVolume = 0.32;
+    const float saberVolume = 0.85f;
 
     float startTime = 0.0f;
     float previousTime = 0.0f;
@@ -91,39 +97,34 @@ private:
     bool finished = false;
     bool synthReady = false;
 
-    int lastSwing = -1;
-    int lastClash = 0;
+    bool saberAudioLoaded = false;
+    bool saberAudioStarted = false;
+    bool saberAudioStopped = false;
 
     std::vector<Star> stars;
     std::vector<Particle> particles;
 
     std::array<Ship, shipCount> ships;
-    std::array<SoundVoice, shipCount> laserVoices;
+    std::array<LaserVoice, shipCount> laserVoices;
     std::array<int, shipCount> lastSoundCycle;
 
-    SoundVoice swingVoice;
-    SoundVoice impactVoice;
-
-    // Thread-safe communication from animation to audio.
+    // Thread-safe communication for spaceship laser sounds.
     std::array<std::atomic<bool>, shipCount> pendingLasers;
-    std::atomic<bool> pendingSwing{ false };
-    std::atomic<bool> pendingImpact{ false };
     std::atomic<float> synthTargetGain{ 0.0f };
 
-    // Audio-thread state.
+    // Only the audio callback changes this value.
     float synthGain = 0.0f;
-    double filteredNoise = 0.0;
-    std::uint32_t noiseState = 123456789u;
 
     ofTrueTypeFont titleFont;
     ofTrueTypeFont textFont;
 
     ofSoundPlayer soundtrack;
+    ofSoundPlayer saberAudio;
     ofSoundStream synthStream;
 
     void setupShips();
-    void updateProceduralSounds();
-    double nextNoise();
+    void updateShipSounds();
+    void updateSaberAudio();
 
     void drawScene1(float time);
     void drawScene2(float time);

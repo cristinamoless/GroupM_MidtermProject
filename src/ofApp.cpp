@@ -12,9 +12,11 @@ void Star::reset(float width, float height,
     pos.z = randomDepth ? ofRandom(40.0f, depth) : depth;
 
     const float focalLength = width * 0.5f;
+
     const float sx = ofRandom(-width * 0.5f, width * 0.5f);
     const float sy = ofRandom(-height * 0.5f, height * 0.5f);
 
+    // Convert visible screen coordinates into world coordinates.
     pos.x = sx * pos.z / focalLength;
     pos.y = sy * pos.z / focalLength;
 
@@ -58,7 +60,8 @@ void Star::draw(float trails, float alpha) {
     const float py = pos.y * focalLength / previousZ;
 
     const float radius = ofMap(
-        pos.z, 20.0f, maxDepth, 3.2f, 0.7f, true
+        pos.z, 20.0f, maxDepth,
+        3.2f, 0.7f, true
     );
 
     const float opacity = alpha * brightness / 255.0f;
@@ -86,8 +89,12 @@ void Star::draw(float trails, float alpha) {
 
 void Particle::setup() {
     pos.set(ofRandomWidth(), ofRandomHeight());
-    velocity.set(ofRandom(-30.0f, 30.0f),
-        ofRandom(-30.0f, 30.0f));
+
+    velocity.set(
+        ofRandom(-30.0f, 30.0f),
+        ofRandom(-30.0f, 30.0f)
+    );
+
     radius = ofRandom(1.0f, 3.0f);
 }
 
@@ -95,9 +102,12 @@ void Particle::update(float dt) {
     const float width = static_cast<float>(ofGetWidth());
     const float height = static_cast<float>(ofGetHeight());
 
-    if (width <= 0.0f || height <= 0.0f) return;
+    if (width <= 0.0f || height <= 0.0f) {
+        return;
+    }
 
     pos += velocity * dt;
+
     pos.x = std::fmod(pos.x, width);
     pos.y = std::fmod(pos.y, height);
 
@@ -107,8 +117,12 @@ void Particle::update(float dt) {
 
 void Particle::draw(float opacity) {
     ofFill();
-    ofSetColor(0, 220, 255,
-        100.0f * ofClamp(opacity, 0.0f, 1.0f));
+
+    ofSetColor(
+        0, 220, 255,
+        100.0f * ofClamp(opacity, 0.0f, 1.0f)
+    );
+
     ofDrawCircle(pos.x, pos.y, radius);
 }
 
@@ -127,8 +141,9 @@ void ofApp::setup() {
     previousTime = 0.0f;
     musicStarted = false;
     finished = false;
-    lastSwing = -1;
-    lastClash = 0;
+
+    saberAudioStarted = false;
+    saberAudioStopped = false;
 
     stars.clear();
     stars.reserve(600);
@@ -159,6 +174,7 @@ void ofApp::setup() {
             << "arial.ttf not found. Using bitmap fallback.";
     }
 
+    // Load background music without starting playback.
     musicLoaded = soundtrack.load("musica.mp3");
 
     if (musicLoaded) {
@@ -171,21 +187,28 @@ void ofApp::setup() {
             << "Could not load bin/data/musica.mp3";
     }
 
-    // Initialize all audio state before starting callbacks.
+    // Load the lightsaber scene audio.
+    saberAudioLoaded = saberAudio.load("espases.mp3");
+
+    if (saberAudioLoaded) {
+        saberAudio.setLoop(false);
+        saberAudio.setMultiPlay(false);
+        saberAudio.setVolume(0.0f);
+    }
+    else {
+        ofLogWarning("Audio")
+            << "Could not load bin/data/espases.mp3";
+    }
+
+    // Initialize shared data before starting audio callbacks.
     setupShips();
 
-    swingVoice = SoundVoice();
-    impactVoice = SoundVoice();
-
-    pendingSwing.store(false);
-    pendingImpact.store(false);
     synthTargetGain.store(0.0f);
-
     synthGain = 0.0f;
-    filteredNoise = 0.0;
-    noiseState = 123456789u;
 
+    // This stream generates only the spaceship laser sounds.
     ofSoundStreamSettings settings;
+
     settings.setOutListener(this);
     settings.sampleRate = 44100;
     settings.bufferSize = 256;
@@ -197,9 +220,10 @@ void ofApp::setup() {
 
     if (!synthReady) {
         ofLogWarning("Audio")
-            << "Could not open the output device for sound effects.";
+            << "Could not open the output device for laser sounds.";
     }
 
+    // Resource loading does not consume animation time.
     startTime = ofGetElapsedTimef();
 }
 
@@ -209,11 +233,14 @@ void ofApp::setupShips() {
 
         ship.travel = ofRandom(2.5f, 5.5f);
         ship.pause = ofRandom(1.0f, 3.0f);
-        ship.offset = ship.travel + ofRandom(0.0f, ship.pause);
+
+        ship.offset =
+            ship.travel + ofRandom(0.0f, ship.pause);
 
         ship.height = ofRandom(0.12f, 0.88f);
         ship.slope = ofRandom(-0.10f, 0.10f);
         ship.trail = ofRandom(18.0f, 65.0f);
+
         ship.movesRight = (i % 2 == 0);
 
         ship.pitch = ofRandom(900.0f, 1900.0f);
@@ -221,7 +248,7 @@ void ofApp::setupShips() {
 
         lastSoundCycle[i] = -1;
         pendingLasers[i].store(false);
-        laserVoices[i] = SoundVoice();
+        laserVoices[i] = LaserVoice();
     }
 }
 
@@ -232,7 +259,9 @@ void ofApp::setupShips() {
 void ofApp::update() {
     ofSoundUpdate();
 
-    if (finished) return;
+    if (finished) {
+        return;
+    }
 
     currentTime = ofGetElapsedTimef() - startTime;
 
@@ -244,11 +273,14 @@ void ofApp::update() {
         synthTargetGain.store(0.0f);
 
         if (musicLoaded) soundtrack.stop();
+        if (saberAudioLoaded) saberAudio.stop();
 
+        saberAudioStopped = true;
         finished = true;
         return;
     }
 
+    // Start background music once at second 12.
     if (musicLoaded &&
         !musicStarted &&
         currentTime >= musicStart) {
@@ -256,30 +288,41 @@ void ofApp::update() {
         musicStarted = true;
     }
 
+    // Keep music at 40% and fade during the final five seconds.
     if (musicLoaded && musicStarted) {
         soundtrack.setVolume(
-            ofMap(currentTime,
+            ofMap(
+                currentTime,
                 duration - 5.0f, duration,
-                musicVolume, 0.0f, true)
+                musicVolume, 0.0f,
+                true
+            )
         );
     }
 
-    updateProceduralSounds();
+    updateShipSounds();
+    updateSaberAudio();
 
     if (currentTime < planetStart &&
-        ofGetWidth() > 0 && ofGetHeight() > 0) {
+        ofGetWidth() > 0 &&
+        ofGetHeight() > 0) {
         float speed = 30.0f;
 
         if (currentTime >= musicStart) {
             speed = ofMap(
-                currentTime, musicStart, planetStart - 2.0f,
-                30.0f, 3000.0f, true
+                currentTime,
+                musicStart, planetStart - 2.0f,
+                30.0f, 3000.0f,
+                true
             );
         }
 
         for (auto& star : stars) {
-            star.update(speed, dt,
-                ofGetWidth(), ofGetHeight(), starDepth);
+            star.update(
+                speed, dt,
+                ofGetWidth(), ofGetHeight(),
+                starDepth
+            );
         }
     }
 
@@ -288,95 +331,86 @@ void ofApp::update() {
     }
 }
 
-void ofApp::updateProceduralSounds() {
-    if (!synthReady) return;
-
-    if (currentTime >= planetStart && currentTime < saberStart) {
-        synthTargetGain.store(
-            fade(currentTime,
-                planetStart, planetStart + 2.0f,
-                saberStart - 2.0f, saberStart)
-        );
-
-        const float width = static_cast<float>(ofGetWidth());
-
-        if (width <= 0.0f || ofGetHeight() <= 0) return;
-
-        const float localTime = currentTime - planetStart;
-        const float entry = 120.0f / (width + 240.0f);
-        const float leaving = 1.0f - entry;
-
-        for (int i = 0; i < shipCount; ++i) {
-            const Ship& ship = ships[i];
-
-            const float cycleDuration = ship.travel + ship.pause;
-            const float elapsed = localTime + ship.offset;
-
-            const int cycle = static_cast<int>(
-                std::floor(elapsed / cycleDuration)
-                );
-
-            const float progress =
-                std::fmod(elapsed, cycleDuration) / ship.travel;
-
-            if (progress >= entry &&
-                progress < leaving &&
-                cycle != lastSoundCycle[i]) {
-                lastSoundCycle[i] = cycle;
-                pendingLasers[i].store(true);
-            }
-        }
+void ofApp::updateShipSounds() {
+    if (!synthReady ||
+        currentTime < planetStart ||
+        currentTime >= saberStart) {
+        synthTargetGain.store(0.0f);
+        return;
     }
-    else if (currentTime >= saberStart &&
-        currentTime < creditsStart) {
-        const float localTime = currentTime - saberStart;
 
-        synthTargetGain.store(
-            fade(currentTime,
-                saberStart, saberStart + 1.0f,
-                creditsStart - 1.0f, creditsStart)
-        );
+    synthTargetGain.store(
+        fade(
+            currentTime,
+            planetStart, planetStart + 2.0f,
+            saberStart - 2.0f, saberStart
+        )
+    );
 
-        // Trigger a swing during each fast blade movement.
-        if (localTime >= 0.5f) {
-            const int swing = static_cast<int>(
-                std::floor(localTime - 0.5f)
-                );
+    const float width = static_cast<float>(ofGetWidth());
 
-            if (swing > lastSwing) {
-                lastSwing = swing;
-                pendingSwing.store(true);
-            }
-        }
+    if (width <= 0.0f || ofGetHeight() <= 0) {
+        return;
+    }
 
-        // Trigger impacts at local seconds 1, 3, 5, 7, 9, 11 and 13.
-        const int clash = static_cast<int>(
-            std::floor((localTime + 1.0f) / 2.0f)
+    const float localTime = currentTime - planetStart;
+    const float entry = 120.0f / (width + 240.0f);
+    const float leaving = 1.0f - entry;
+
+    for (int i = 0; i < shipCount; ++i) {
+        const Ship& ship = ships[i];
+
+        const float cycleDuration = ship.travel + ship.pause;
+        const float elapsed = localTime + ship.offset;
+
+        const int cycle = static_cast<int>(
+            std::floor(elapsed / cycleDuration)
             );
 
-        if (clash > lastClash) {
-            lastClash = clash;
-            pendingImpact.store(true);
+        const float progress =
+            std::fmod(elapsed, cycleDuration) / ship.travel;
+
+        if (progress >= entry &&
+            progress < leaving &&
+            cycle != lastSoundCycle[i]) {
+            lastSoundCycle[i] = cycle;
+            pendingLasers[i].store(true);
         }
     }
-    else {
-        synthTargetGain.store(0.0f);
+}
+
+void ofApp::updateSaberAudio() {
+    if (!saberAudioLoaded) {
+        return;
+    }
+
+    if (currentTime >= saberStart &&
+        currentTime < creditsStart) {
+        // Brief fade-in and a one-second fade-out.
+        const float audioOpacity = fade(
+            currentTime,
+            saberStart, saberStart + 0.25f,
+            creditsStart - 1.0f, creditsStart
+        );
+
+        saberAudio.setVolume(saberVolume * audioOpacity);
+
+        // Play once from the beginning of the MP3.
+        if (!saberAudioStarted) {
+            saberAudio.play();
+            saberAudioStarted = true;
+        }
+    }
+    else if (currentTime >= creditsStart &&
+        !saberAudioStopped) {
+        saberAudio.stop();
+        saberAudioStopped = true;
     }
 }
 
 // ============================================================
-// PROCEDURAL AUDIO
+// GENERATIVE SPACESHIP AUDIO
 // ============================================================
-
-double ofApp::nextNoise() {
-    // Xorshift noise generator, used only by the audio thread.
-    noiseState ^= noiseState << 13;
-    noiseState ^= noiseState >> 17;
-    noiseState ^= noiseState << 5;
-
-    return (static_cast<double>(noiseState) / 4294967295.0)
-        * 2.0 - 1.0;
-}
 
 void ofApp::audioOut(ofSoundBuffer& buffer) {
     // Clear the underlying sample vector.
@@ -384,7 +418,10 @@ void ofApp::audioOut(ofSoundBuffer& buffer) {
     std::fill(samples.begin(), samples.end(), 0.0f);
 
     const std::size_t channels = buffer.getNumChannels();
-    if (channels == 0) return;
+
+    if (channels == 0) {
+        return;
+    }
 
     const double sampleRate =
         buffer.getSampleRate() > 0
@@ -392,160 +429,91 @@ void ofApp::audioOut(ofSoundBuffer& buffer) {
         : 44100.0;
 
     const double dt = 1.0 / sampleRate;
-    const double pi = 3.141592653589793;
-    const double twoPi = 2.0 * pi;
-    const double halfPi = pi * 0.5;
+    const double twoPi = 6.283185307179586;
+    const double halfPi = 1.5707963267948966;
 
     const float target = synthTargetGain.load();
 
-    // Receive events without changing audio state from update().
+    // Receive sound requests from the animation thread.
     for (int i = 0; i < shipCount; ++i) {
-        if (pendingLasers[i].exchange(false) && target > 0.0f) {
+        if (pendingLasers[i].exchange(false) &&
+            target > 0.0f) {
             laserVoices[i].active = true;
             laserVoices[i].phase = 0.0;
             laserVoices[i].age = 0.0;
         }
     }
 
-    if (pendingSwing.exchange(false) && target > 0.0f) {
-        swingVoice.active = true;
-        swingVoice.phase = 0.0;
-        swingVoice.age = 0.0;
-    }
-
-    if (pendingImpact.exchange(false) && target > 0.0f) {
-        impactVoice.active = true;
-        impactVoice.phase = 0.0;
-        impactVoice.age = 0.0;
-    }
-
     const float smoothing = static_cast<float>(
         1.0 - std::exp(-1.0 / (0.005 * sampleRate))
         );
 
-    const double noiseSmoothing =
-        1.0 - std::exp(-twoPi * 900.0 / sampleRate);
-
     for (std::size_t frame = 0;
-        frame < buffer.getNumFrames(); ++frame) {
+        frame < buffer.getNumFrames();
+        ++frame) {
         synthGain += (target - synthGain) * smoothing;
 
         double left = 0.0;
         double right = 0.0;
 
-        // Spaceship laser sounds.
         for (int i = 0; i < shipCount; ++i) {
-            SoundVoice& voice = laserVoices[i];
+            LaserVoice& voice = laserVoices[i];
             const Ship& ship = ships[i];
 
-            if (!voice.active) continue;
+            if (!voice.active) {
+                continue;
+            }
 
             if (voice.age >= ship.soundDuration) {
                 voice.active = false;
                 continue;
             }
 
-            const double progress = voice.age / ship.soundDuration;
+            const double progress =
+                voice.age / ship.soundDuration;
+
+            // Falling pitch creates the "pew" effect.
             const double frequency =
-                140.0 + (ship.pitch - 140.0) *
+                140.0 +
+                (ship.pitch - 140.0) *
                 std::exp(-4.5 * progress);
 
-            const double attack = std::min(1.0, voice.age / 0.006);
+            const double attack =
+                std::min(1.0, voice.age / 0.006);
+
             const double release = 1.0 - progress;
-            const double envelope = attack * release * release;
+            const double envelope =
+                attack * release * release;
 
             const double wave =
                 std::sin(voice.phase) +
                 0.18 * std::sin(voice.phase * 2.0);
 
-            const double sample = wave * envelope * laserVolume;
-            const double pan = ship.movesRight ? 0.2 : 0.8;
+            const double sample =
+                wave * envelope * laserVolume;
+
+            const double pan =
+                ship.movesRight ? 0.2 : 0.8;
 
             left += sample * std::cos(pan * halfPi);
             right += sample * std::sin(pan * halfPi);
 
             voice.phase += twoPi * frequency * dt;
-            if (voice.phase >= twoPi) voice.phase -= twoPi;
+
+            if (voice.phase >= twoPi) {
+                voice.phase -= twoPi;
+            }
+
             voice.age += dt;
         }
 
-        // Generate noise for the saber effects.
-        const double noise = nextNoise();
-        filteredNoise += noiseSmoothing * (noise - filteredNoise);
+        const float outLeft = static_cast<float>(
+            std::tanh(left * synthGain)
+            );
 
-        // Saber movement: low buzzing tone and filtered air noise.
-        if (swingVoice.active) {
-            const double length = 0.55;
-
-            if (swingVoice.age >= length) {
-                swingVoice.active = false;
-            }
-            else {
-                const double progress = swingVoice.age / length;
-                const double curve = std::sin(pi * progress);
-                const double envelope = curve * curve;
-
-                const double frequency = 85.0 + 150.0 * curve;
-
-                const double buzz =
-                    0.65 * std::sin(swingVoice.phase) +
-                    0.25 * std::sin(swingVoice.phase * 2.0) +
-                    0.10 * std::sin(swingVoice.phase * 3.0);
-
-                const double sound = swingVolume * envelope *
-                    (buzz + 0.8 * filteredNoise);
-
-                left += sound * 0.707;
-                right += sound * 0.707;
-
-                swingVoice.phase += twoPi * frequency * dt;
-                if (swingVoice.phase >= twoPi) {
-                    swingVoice.phase -= twoPi;
-                }
-
-                swingVoice.age += dt;
-            }
-        }
-
-        // Saber impact: a sharp noise burst and metallic tones.
-        if (impactVoice.active) {
-            const double length = 0.40;
-
-            if (impactVoice.age >= length) {
-                impactVoice.active = false;
-            }
-            else {
-                const double age = impactVoice.age;
-                const double progress = age / length;
-
-                const double attack = std::min(1.0, age / 0.002);
-                const double release = 1.0 - progress;
-
-                const double envelope =
-                    attack * release * release *
-                    std::exp(-7.0 * age);
-
-                const double metal =
-                    0.45 * std::sin(twoPi * 430.0 * age) +
-                    0.30 * std::sin(twoPi * 713.0 * age) +
-                    0.15 * std::sin(twoPi * 1189.0 * age);
-
-                const double sound = impactVolume * envelope *
-                    (0.80 * noise + metal);
-
-                left += sound * 0.707;
-                right += sound * 0.707;
-
-                impactVoice.age += dt;
-            }
-        }
-
-        // Soft limiting controls overlapping sound effects.
-        const float outLeft =
-            static_cast<float>(std::tanh(left * synthGain));
-
-        const float outRight =
-            static_cast<float>(std::tanh(right * synthGain));
+        const float outRight = static_cast<float>(
+            std::tanh(right * synthGain)
+            );
 
         if (channels == 1) {
             buffer[frame] = (outLeft + outRight) * 0.5f;
@@ -563,7 +531,10 @@ void ofApp::audioOut(ofSoundBuffer& buffer) {
 
 void ofApp::draw() {
     ofBackground(0);
-    if (finished || currentTime >= duration) return;
+
+    if (finished || currentTime >= duration) {
+        return;
+    }
 
     ofPushStyle();
     ofEnableAlphaBlending();
@@ -599,6 +570,7 @@ void ofApp::exit() {
     synthStream.close();
 
     if (musicLoaded) soundtrack.stop();
+    if (saberAudioLoaded) saberAudio.stop();
 }
 
 // ============================================================
@@ -615,9 +587,14 @@ void ofApp::drawStars(float trails, float alpha) {
     ofPushStyle();
     ofPushMatrix();
 
-    ofTranslate(ofGetWidth() * 0.5f, ofGetHeight() * 0.5f);
+    ofTranslate(
+        ofGetWidth() * 0.5f,
+        ofGetHeight() * 0.5f
+    );
 
-    for (auto& star : stars) star.draw(trails, alpha);
+    for (auto& star : stars) {
+        star.draw(trails, alpha);
+    }
 
     ofPopMatrix();
     ofPopStyle();
@@ -626,7 +603,9 @@ void ofApp::drawStars(float trails, float alpha) {
 void ofApp::drawParticles(float opacity) {
     ofPushStyle();
 
-    for (auto& particle : particles) particle.draw(opacity);
+    for (auto& particle : particles) {
+        particle.draw(opacity);
+    }
 
     ofPopStyle();
 }
@@ -706,7 +685,9 @@ void ofApp::drawScene1(float time) {
     const float alpha =
         255.0f * fade(time, 3.0f, 4.0f, 10.0f, musicStart);
 
-    if (alpha <= 0.0f) return;
+    if (alpha <= 0.0f) {
+        return;
+    }
 
     ofSetColor(85, 190, 235, alpha);
 
@@ -716,12 +697,14 @@ void ofApp::drawScene1(float time) {
 
     drawCenteredText(
         "A long time ago in a galaxy far,",
-        cx, cy - 24.0f, textFont, maxWidth
+        cx, cy - 24.0f,
+        textFont, maxWidth
     );
 
     drawCenteredText(
         "far away....",
-        cx, cy + 24.0f, textFont, maxWidth
+        cx, cy + 24.0f,
+        textFont, maxWidth
     );
 }
 
@@ -730,15 +713,20 @@ void ofApp::drawScene1(float time) {
 // ============================================================
 
 void ofApp::drawScene2(float time) {
-    drawStars(
-        ofMap(time, musicStart, musicStart + 3.0f,
-            0.0f, 1.0f, true),
-        255.0f
+    const float trails = ofMap(
+        time,
+        musicStart, musicStart + 3.0f,
+        0.0f, 1.0f,
+        true
     );
 
+    drawStars(trails, 255.0f);
+
     const float flash = ofMap(
-        time, planetStart - 2.0f, planetStart,
-        0.0f, 255.0f, true
+        time,
+        planetStart - 2.0f, planetStart,
+        0.0f, 255.0f,
+        true
     );
 
     ofFill();
@@ -754,7 +742,8 @@ void ofApp::drawScene3(float time) {
     const float localTime = time - planetStart;
 
     const float opacity = fade(
-        time, planetStart, planetStart + 2.0f,
+        time,
+        planetStart, planetStart + 2.0f,
         saberStart - 2.0f, saberStart
     );
 
@@ -770,14 +759,22 @@ void ofApp::drawScene3(float time) {
         const Ship& ship = ships[i];
 
         const float cycleTime = std::fmod(
-            localTime + ship.offset, ship.travel + ship.pause
+            localTime + ship.offset,
+            ship.travel + ship.pause
         );
 
-        if (cycleTime >= ship.travel) continue;
+        if (cycleTime >= ship.travel) {
+            continue;
+        }
 
         const float progress = cycleTime / ship.travel;
-        const float startX = ship.movesRight ? -120.0f : width + 120.0f;
-        const float endX = ship.movesRight ? width + 120.0f : -120.0f;
+
+        const float startX =
+            ship.movesRight ? -120.0f : width + 120.0f;
+
+        const float endX =
+            ship.movesRight ? width + 120.0f : -120.0f;
+
         const float startY = ship.height * height;
         const float endY = startY + ship.slope * height;
 
@@ -816,7 +813,9 @@ void ofApp::drawScene3(float time) {
     ofScale(fit, fit, fit);
 
     ofRotateYDeg(localTime * 15.0f);
-    ofRotateXDeg(15.0f + ofNoise(localTime * 0.1f) * 30.0f);
+    ofRotateXDeg(
+        15.0f + ofNoise(localTime * 0.1f) * 30.0f
+    );
 
     const float pulse =
         1.0f + 0.02f * std::sin(localTime * 2.0f);
@@ -834,8 +833,10 @@ void ofApp::drawScene3(float time) {
     ofPopStyle();
 
     const float flash = ofMap(
-        time, planetStart, planetStart + 2.0f,
-        255.0f, 0.0f, true
+        time,
+        planetStart, planetStart + 2.0f,
+        255.0f, 0.0f,
+        true
     );
 
     ofFill();
@@ -861,17 +862,30 @@ void ofApp::drawLightsaber(float x, float y,
     for (int layer = 7; layer >= 1; --layer) {
         const float radius = 3.0f + layer * 3.0f;
 
-        ofSetColor(color.r, color.g, color.b, opacity * 12.0f);
-        ofDrawRectangle(-radius, -bladeLength,
-            radius * 2.0f, bladeLength);
+        ofSetColor(
+            color.r, color.g, color.b,
+            opacity * 12.0f
+        );
+
+        ofDrawRectangle(
+            -radius, -bladeLength,
+            radius * 2.0f, bladeLength
+        );
+
         ofDrawCircle(0, -bladeLength, radius);
         ofDrawCircle(0, 0, radius);
     }
 
-    ofSetColor(color.r, color.g, color.b, opacity * 240.0f);
+    // Colored blade.
+    ofSetColor(
+        color.r, color.g, color.b,
+        opacity * 240.0f
+    );
+
     ofDrawRectangle(-5.0f, -bladeLength, 10.0f, bladeLength);
     ofDrawCircle(0, -bladeLength, 5.0f);
 
+    // White core.
     ofSetColor(255, 255, 255, opacity * 255.0f);
     ofDrawRectangle(-2.0f, -bladeLength, 4.0f, bladeLength);
     ofDrawCircle(0, -bladeLength, 2.0f);
@@ -883,12 +897,17 @@ void ofApp::drawLightsaber(float x, float y,
     ofSetColor(165, 175, 190, opacity * 255.0f);
     ofDrawRectangle(-7.0f, 3.0f, 4.0f, 57.0f);
 
+    // Grip bands.
     ofSetColor(25, 28, 35, opacity * 255.0f);
 
     for (int i = 0; i < 5; ++i) {
-        ofDrawRectangle(-10.0f, 14.0f + i * 9.0f, 20.0f, 3.0f);
+        ofDrawRectangle(
+            -10.0f, 14.0f + i * 9.0f,
+            20.0f, 3.0f
+        );
     }
 
+    // Blade emitter.
     ofSetColor(195, 205, 220, opacity * 255.0f);
     ofDrawRectangle(-12.0f, -4.0f, 24.0f, 9.0f);
 
@@ -904,7 +923,8 @@ void ofApp::drawSaberScene(float time) {
     const float localTime = time - saberStart;
 
     const float opacity = fade(
-        time, saberStart, saberStart + 1.0f,
+        time,
+        saberStart, saberStart + 1.0f,
         creditsStart - 1.0f, creditsStart
     );
 
@@ -916,7 +936,11 @@ void ofApp::drawSaberScene(float time) {
         ofGetHeight() / 720.0f
     );
 
-    ofTranslate(ofGetWidth() * 0.5f, ofGetHeight() * 0.5f);
+    ofTranslate(
+        ofGetWidth() * 0.5f,
+        ofGetHeight() * 0.5f
+    );
+
     ofScale(fit, fit);
 
     ofTranslate(
@@ -942,15 +966,21 @@ void ofApp::drawSaberScene(float time) {
     drawLightsaber(
         -pivotX, pivotY,
         contactAngle - leftSwing * separation,
-        285.0f, ofColor(255, 25, 35), opacity
+        285.0f,
+        ofColor(255, 25, 35),
+        opacity
     );
 
     drawLightsaber(
         pivotX, pivotY,
         -contactAngle + rightSwing * separation,
-        285.0f, ofColor(30, 110, 255), opacity
+        285.0f,
+        ofColor(30, 110, 255),
+        opacity
     );
 
+    // Visual impacts remain part of the animation.
+    // The MP3 plays independently throughout this scene.
     const int clash = static_cast<int>(
         std::floor((localTime + 1.0f) / 2.0f)
         );
@@ -965,16 +995,23 @@ void ofApp::drawSaberScene(float time) {
             ofFill();
 
             for (int layer = 5; layer >= 1; --layer) {
-                ofSetColor(255, 210, 130,
-                    opacity * flash * 22.0f);
-                ofDrawCircle(0, 0,
-                    layer * 12.0f + sinceHit * 60.0f);
+                ofSetColor(
+                    255, 210, 130,
+                    opacity * flash * 22.0f
+                );
+
+                ofDrawCircle(
+                    0, 0,
+                    layer * 12.0f + sinceHit * 60.0f
+                );
             }
 
-            ofSetColor(255, 250, 225,
-                opacity * flash * 255.0f);
-            ofDrawCircle(0, 0, 11.0f * flash + 2.0f);
+            ofSetColor(
+                255, 250, 225,
+                opacity * flash * 255.0f
+            );
 
+            ofDrawCircle(0, 0, 11.0f * flash + 2.0f);
             ofSetLineWidth(2.0f);
 
             for (int i = 0; i < 16; ++i) {
@@ -986,11 +1023,15 @@ void ofApp::drawSaberScene(float time) {
 
                 const float trail = 6.0f + flash * 10.0f;
                 const float x = std::cos(angle) * radius;
-                const float y = std::sin(angle) * radius +
+
+                const float y =
+                    std::sin(angle) * radius +
                     90.0f * sinceHit * sinceHit;
 
-                ofSetColor(255, 210, 90,
-                    opacity * flash * 255.0f);
+                ofSetColor(
+                    255, 210, 90,
+                    opacity * flash * 255.0f
+                );
 
                 ofDrawLine(
                     x - std::cos(angle) * trail,
@@ -1011,8 +1052,11 @@ void ofApp::drawSaberScene(float time) {
 
 void ofApp::drawScene4(float time) {
     drawParticles(
-        fade(time, creditsStart, creditsStart + 1.0f,
-            titleStart - 1.0f, titleStart)
+        fade(
+            time,
+            creditsStart, creditsStart + 1.0f,
+            titleStart - 1.0f, titleStart
+        )
     );
 
     const float localTime = time - creditsStart;
@@ -1037,31 +1081,47 @@ void ofApp::drawScene4(float time) {
     }
 
     const float opacity = fade(
-        time, blockStart, blockStart + 1.0f,
+        time,
+        blockStart, blockStart + 1.0f,
         blockStart + 4.0f, blockStart + 5.0f
     );
 
     const float scale = ofMap(
-        time, blockStart, blockStart + 5.0f,
-        0.95f, 1.05f, true
+        time,
+        blockStart, blockStart + 5.0f,
+        0.95f, 1.05f,
+        true
     );
 
     const float offsetY = ofMap(
-        time, blockStart, blockStart + 5.0f,
-        10.0f, -10.0f, true
+        time,
+        blockStart, blockStart + 5.0f,
+        10.0f, -10.0f,
+        true
     );
 
     ofSetColor(255, 204, 0, opacity * 255.0f);
 
     ofPushMatrix();
-    ofTranslate(ofGetWidth() * 0.5f,
-        ofGetHeight() * 0.5f + offsetY);
+
+    ofTranslate(
+        ofGetWidth() * 0.5f,
+        ofGetHeight() * 0.5f + offsetY
+    );
+
     ofScale(scale, scale);
 
     const float maxWidth = ofGetWidth() * 0.88f / scale;
 
-    drawCenteredText(line1, 0, -35, textFont, maxWidth);
-    drawCenteredText(line2, 0, 35, textFont, maxWidth);
+    drawCenteredText(
+        line1, 0.0f, -35.0f,
+        textFont, maxWidth
+    );
+
+    drawCenteredText(
+        line2, 0.0f, 35.0f,
+        textFont, maxWidth
+    );
 
     ofPopMatrix();
 }
@@ -1072,30 +1132,40 @@ void ofApp::drawScene4(float time) {
 
 void ofApp::drawScene5(float time) {
     const float opacity = fade(
-        time, titleStart, titleStart + 3.0f,
+        time,
+        titleStart, titleStart + 3.0f,
         duration - 5.0f, duration
     );
 
     drawParticles(opacity);
 
     const float localTime = time - titleStart;
+
     const float pulse =
         1.0f + std::sin(localTime * 2.0f) * 0.02f;
 
     const float scale = ofMap(
-        time, titleStart, titleStart + 6.0f,
-        1.15f, 1.0f, true
+        time,
+        titleStart, titleStart + 6.0f,
+        1.15f, 1.0f,
+        true
     ) * pulse;
 
     ofPushMatrix();
-    ofTranslate(ofGetWidth() * 0.5f, ofGetHeight() * 0.5f);
-    ofScale(scale, scale);
 
+    ofTranslate(
+        ofGetWidth() * 0.5f,
+        ofGetHeight() * 0.5f
+    );
+
+    ofScale(scale, scale);
     ofSetColor(255, 204, 0, opacity * 255.0f);
 
     drawCenteredText(
         "EL DESPERTAR ESTEL·LAR",
-        0, 0, titleFont, ofGetWidth() * 0.78f
+        0.0f, 0.0f,
+        titleFont,
+        ofGetWidth() * 0.78f
     );
 
     ofPopMatrix();
