@@ -2,6 +2,8 @@
 #include <algorithm>
 #include <cmath>
 
+// We wanted to create a space intro inspired by Star Wars.
+// We used code for the visuals and audio files for the music and saber scene.
 
 void Star::reset(float width, float height,
     float depth, bool randomDepth) {
@@ -10,10 +12,11 @@ void Star::reset(float width, float height,
 
     const float focalLength = width * 0.5f;
 
+    // We vary the position and brightness so the stars do not look identical.
     const float sx = ofRandom(-width * 0.5f, width * 0.5f);
     const float sy = ofRandom(-height * 0.5f, height * 0.5f);
 
-    // Convert visible screen coordinates into world coordinates.
+    // Convert screen positions into 3D positions for the starfield.
     pos.x = sx * pos.z / focalLength;
     pos.y = sy * pos.z / focalLength;
 
@@ -27,6 +30,8 @@ void Star::setup(float width, float height, float depth) {
 
 void Star::update(float speed, float dt,
     float width, float height, float depth) {
+
+    // We use dt to keep the movement consistent at different frame rates.
     pos.z -= speed * dt;
 
     if (pos.z <= 20.0f) {
@@ -44,18 +49,20 @@ void Star::update(float speed, float dt,
         return;
     }
 
-    // Fixed exposure time keeps trails independent of frame rate.
+    // We keep the trail length consistent at different frame rates.
     previousZ = pos.z + speed * 0.025f;
 }
 
 void Star::draw(float trails, float alpha) {
     const float focalLength = ofGetWidth() * 0.5f;
 
+    // We use depth to make the stars look like they are moving towards us.
     const float sx = pos.x * focalLength / pos.z;
     const float sy = pos.y * focalLength / pos.z;
     const float px = pos.x * focalLength / previousZ;
     const float py = pos.y * focalLength / previousZ;
 
+    // Closer stars look bigger.
     const float radius = ofMap(
         pos.z, 20.0f, maxDepth,
         3.2f, 0.7f, true
@@ -80,7 +87,6 @@ void Star::draw(float trails, float alpha) {
     ofSetLineWidth(1.0f);
 }
 
-
 void Particle::setup() {
     pos.set(ofRandomWidth(), ofRandomHeight());
 
@@ -102,6 +108,7 @@ void Particle::update(float dt) {
 
     pos += velocity * dt;
 
+    // When a particle leaves the screen, we bring it back on the opposite side.
     pos.x = std::fmod(pos.x, width);
     pos.y = std::fmod(pos.y, height);
 
@@ -119,8 +126,6 @@ void Particle::draw(float opacity) {
 
     ofDrawCircle(pos.x, pos.y, radius);
 }
-
-
 
 void ofApp::setup() {
     ofSetFrameRate(60);
@@ -166,7 +171,7 @@ void ofApp::setup() {
             << "arial.ttf not found. Using bitmap fallback.";
     }
 
-    // Load background music without starting playback.
+    // We load the music now, but keep the opening silent.
     musicLoaded = soundtrack.load("musica.mp3");
 
     if (musicLoaded) {
@@ -179,7 +184,7 @@ void ofApp::setup() {
             << "Could not load bin/data/musica.mp3";
     }
 
-    // Load the lightsaber scene audio.
+    // We use an MP3 for the lightsaber fight.
     saberAudioLoaded = saberAudio.load("espases.mp3");
 
     if (saberAudioLoaded) {
@@ -192,13 +197,13 @@ void ofApp::setup() {
             << "Could not load bin/data/espases.mp3";
     }
 
-    // Initialize shared data before starting audio callbacks.
+    // We prepare the ships before starting the sound generator.
     setupShips();
 
     synthTargetGain.store(0.0f);
     synthGain = 0.0f;
 
-    // This stream generates only the spaceship laser sounds.
+    // We generate the spaceship sounds directly in code.
     ofSoundStreamSettings settings;
 
     settings.setOutListener(this);
@@ -215,7 +220,7 @@ void ofApp::setup() {
             << "Could not open the output device for laser sounds.";
     }
 
-    // Resource loading does not consume animation time.
+    // Start the timer after loading everything.
     startTime = ofGetElapsedTimef();
 }
 
@@ -223,6 +228,7 @@ void ofApp::setupShips() {
     for (int i = 0; i < shipCount; ++i) {
         Ship& ship = ships[i];
 
+        // Each ship has different speeds, pauses and sounds to add variety.
         ship.travel = ofRandom(2.5f, 5.5f);
         ship.pause = ofRandom(1.0f, 3.0f);
 
@@ -243,8 +249,6 @@ void ofApp::setupShips() {
         laserVoices[i] = LaserVoice();
     }
 }
-
-
 
 void ofApp::update() {
     ofSoundUpdate();
@@ -270,7 +274,7 @@ void ofApp::update() {
         return;
     }
 
-    // Start background music once at second 12.
+    // We start the music at second 12, after the opening text.
     if (musicLoaded &&
         !musicStarted &&
         currentTime >= musicStart) {
@@ -278,7 +282,7 @@ void ofApp::update() {
         musicStarted = true;
     }
 
-    // Keep music at 40% and fade during the final five seconds.
+    // Keep the music in the background and fade it out at the end.
     if (musicLoaded && musicStarted) {
         soundtrack.setVolume(
             ofMap(
@@ -360,6 +364,7 @@ void ofApp::updateShipSounds() {
         const float progress =
             std::fmod(elapsed, cycleDuration) / ship.travel;
 
+        // We play one "pew" each time a ship enters the screen.
         if (progress >= entry &&
             progress < leaving &&
             cycle != lastSoundCycle[i]) {
@@ -369,14 +374,84 @@ void ofApp::updateShipSounds() {
     }
 }
 
+void ofApp::drawLightsaber(float x, float y,
+    float angle, float bladeLength,
+    const ofColor& color, float opacity) {
+    ofPushStyle();
+    ofPushMatrix();
+
+    // We draw each saber separately so we can move and rotate it.
+    ofTranslate(x, y);
+    ofRotateDeg(angle);
+    ofFill();
+
+    // We layer transparent shapes to make the blade glow.
+    for (int layer = 7; layer >= 1; --layer) {
+        const float radius = 3.0f + layer * 3.0f;
+
+        ofSetColor(
+            color.r, color.g, color.b,
+            opacity * 12.0f
+        );
+
+        ofDrawRectangle(
+            -radius, -bladeLength,
+            radius * 2.0f, bladeLength
+        );
+
+        ofDrawCircle(0, -bladeLength, radius);
+        ofDrawCircle(0, 0, radius);
+    }
+
+    // We use red and blue to distinguish the two blades.
+    ofSetColor(
+        color.r, color.g, color.b,
+        opacity * 240.0f
+    );
+
+    ofDrawRectangle(-5.0f, -bladeLength, 10.0f, bladeLength);
+    ofDrawCircle(0, -bladeLength, 5.0f);
+
+    // We add a white center to make the blade look brighter.
+    ofSetColor(255, 255, 255, opacity * 255.0f);
+    ofDrawRectangle(-2.0f, -bladeLength, 4.0f, bladeLength);
+    ofDrawCircle(0, -bladeLength, 2.0f);
+
+    // We use grey shapes to give the handle a metallic look.
+    ofSetColor(65, 70, 80, opacity * 255.0f);
+    ofDrawRectangle(-10.0f, 0, 20.0f, 65.0f);
+
+    ofSetColor(165, 175, 190, opacity * 255.0f);
+    ofDrawRectangle(-7.0f, 3.0f, 4.0f, 57.0f);
+
+    // We add dark bands to give the handle more detail.
+    ofSetColor(25, 28, 35, opacity * 255.0f);
+
+    for (int i = 0; i < 5; ++i) {
+        ofDrawRectangle(
+            -10.0f, 14.0f + i * 9.0f,
+            20.0f, 3.0f
+        );
+    }
+
+    // We add a small metal piece where the blade starts.
+    ofSetColor(195, 205, 220, opacity * 255.0f);
+    ofDrawRectangle(-12.0f, -4.0f, 24.0f, 9.0f);
+
+    ofPopMatrix();
+    ofPopStyle();
+}
+
 void ofApp::updateSaberAudio() {
     if (!saberAudioLoaded) {
         return;
     }
 
+    // Play the fight MP3 independently of the individual hits.
     if (currentTime >= saberStart &&
         currentTime < creditsStart) {
-        // Brief fade-in and a one-second fade-out.
+
+        // We fade the fight audio in and out to soften the transition.
         const float audioOpacity = fade(
             currentTime,
             saberStart, saberStart + 0.25f,
@@ -385,7 +460,7 @@ void ofApp::updateSaberAudio() {
 
         saberAudio.setVolume(saberVolume * audioOpacity);
 
-        // Play once from the beginning of the MP3.
+        // Play the MP3 once from the beginning.
         if (!saberAudioStarted) {
             saberAudio.play();
             saberAudioStarted = true;
@@ -398,10 +473,8 @@ void ofApp::updateSaberAudio() {
     }
 }
 
-
-
 void ofApp::audioOut(ofSoundBuffer& buffer) {
-    // Clear the underlying sample vector.
+    // We clear the audio buffer before adding new sounds.
     auto& samples = buffer.getBuffer();
     std::fill(samples.begin(), samples.end(), 0.0f);
 
@@ -422,7 +495,7 @@ void ofApp::audioOut(ofSoundBuffer& buffer) {
 
     const float target = synthTargetGain.load();
 
-    // Receive sound requests from the animation thread.
+    // We safely receive the sound triggers from the animation.
     for (int i = 0; i < shipCount; ++i) {
         if (pendingLasers[i].exchange(false) &&
             target > 0.0f) {
@@ -460,12 +533,13 @@ void ofApp::audioOut(ofSoundBuffer& buffer) {
             const double progress =
                 voice.age / ship.soundDuration;
 
-            // Falling pitch creates the "pew" effect.
+            // We quickly lower the pitch to create the "pew" sound.
             const double frequency =
                 140.0 +
                 (ship.pitch - 140.0) *
                 std::exp(-4.5 * progress);
 
+            // We soften the start and end of the sound to avoid clicks.
             const double attack =
                 std::min(1.0, voice.age / 0.006);
 
@@ -480,6 +554,7 @@ void ofApp::audioOut(ofSoundBuffer& buffer) {
             const double sample =
                 wave * envelope * laserVolume;
 
+            // Place the sound on the side where the ship appears.
             const double pan =
                 ship.movesRight ? 0.2 : 0.8;
 
@@ -495,6 +570,7 @@ void ofApp::audioOut(ofSoundBuffer& buffer) {
             voice.age += dt;
         }
 
+        // We limit the combined level when several laser sounds overlap.
         const float outLeft = static_cast<float>(
             std::tanh(left * synthGain)
             );
@@ -513,8 +589,6 @@ void ofApp::audioOut(ofSoundBuffer& buffer) {
     }
 }
 
-
-
 void ofApp::draw() {
     ofBackground(0);
 
@@ -527,6 +601,7 @@ void ofApp::draw() {
     ofFill();
     ofSetLineWidth(1.0f);
 
+    // Using the elapsed time to decide which scene to show.
     if (currentTime < musicStart) {
         drawScene1(currentTime);
     }
@@ -552,17 +627,17 @@ void ofApp::draw() {
 void ofApp::exit() {
     synthTargetGain.store(0.0f);
 
-    // Stop callbacks before application data is destroyed.
+    // We stop the sound generator before closing the app.
     synthStream.close();
 
     if (musicLoaded) soundtrack.stop();
     if (saberAudioLoaded) saberAudio.stop();
 }
 
-
-
 float ofApp::fade(float time, float begin, float fadeInEnd,
     float fadeOutBegin, float end) {
+
+    // We reuse this function to make images and sounds appear and disappear smoothly.
     return ofMap(time, begin, fadeInEnd, 0.0f, 1.0f, true) *
         ofMap(time, fadeOutBegin, end, 1.0f, 0.0f, true);
 }
@@ -602,6 +677,7 @@ void ofApp::drawCenteredText(const std::string& text,
     ofTranslate(x, y);
 
     if (font.isLoaded()) {
+        // We measure the text to keep it centered.
         const ofRectangle bounds =
             font.getStringBoundingBox(text, 0, 0);
 
@@ -620,7 +696,7 @@ void ofApp::drawCenteredText(const std::string& text,
         );
     }
     else {
-        // Simplify characters for the bitmap fallback.
+        // Replace special characters when using the basic backup font.
         std::string fallback = text;
 
         const std::string accentedO = "\xC3\x93";
@@ -656,14 +732,15 @@ void ofApp::drawCenteredText(const std::string& text,
     ofPopMatrix();
 }
 
-
-//SCENE 1: INTRO
+// -- SCENE 1: --
+// We open with a silent starfield and a short message.
 void ofApp::drawScene1(float time) {
     drawStars(
         0.0f,
         ofMap(time, 0.0f, 2.0f, 0.0f, 255.0f, true)
     );
 
+    // We fade out the opening text before the music starts.
     const float alpha =
         255.0f * fade(time, 3.0f, 4.0f, 10.0f, musicStart);
 
@@ -690,7 +767,8 @@ void ofApp::drawScene1(float time) {
     );
 }
 
-//SCENE 1.2: LIGHT VELOCITY
+//  -- SCENE 1.2: --
+// Accelerate the stars to create a hyperspace jump.
 void ofApp::drawScene2(float time) {
     const float trails = ofMap(
         time,
@@ -701,6 +779,7 @@ void ofApp::drawScene2(float time) {
 
     drawStars(trails, 255.0f);
 
+    // We use a white flash to move from hyperspace to the planet.
     const float flash = ofMap(
         time,
         planetStart - 2.0f, planetStart,
@@ -713,7 +792,8 @@ void ofApp::drawScene2(float time) {
     ofDrawRectangle(0, 0, ofGetWidth(), ofGetHeight());
 }
 
-//SCENE 2: PLANET AND SPACESHIPS
+//  -- SCENE 2: --
+// Holographic planet with passing spaceships.
 void ofApp::drawScene3(float time) {
     const float localTime = time - planetStart;
 
@@ -734,6 +814,7 @@ void ofApp::drawScene3(float time) {
     for (int i = 0; i < shipCount; ++i) {
         const Ship& ship = ships[i];
 
+        // We use different pauses to spread out the spaceship passes.
         const float cycleTime = std::fmod(
             localTime + ship.offset,
             ship.travel + ship.pause
@@ -788,6 +869,7 @@ void ofApp::drawScene3(float time) {
     const float fit = height / 720.0f;
     ofScale(fit, fit, fit);
 
+    // We slowly rotate the planet and use noise to vary its tilt.
     ofRotateYDeg(localTime * 15.0f);
     ofRotateXDeg(
         15.0f + ofNoise(localTime * 0.1f) * 30.0f
@@ -796,6 +878,7 @@ void ofApp::drawScene3(float time) {
     const float pulse =
         1.0f + 0.02f * std::sin(localTime * 2.0f);
 
+    // We draw the planet with lines to give it an holographic look.
     ofNoFill();
     ofSetLineWidth(1.2f);
 
@@ -820,76 +903,8 @@ void ofApp::drawScene3(float time) {
     ofDrawRectangle(0, 0, width, height);
 }
 
-
-
-void ofApp::drawLightsaber(float x, float y,
-    float angle, float bladeLength,
-    const ofColor& color, float opacity) {
-    ofPushStyle();
-    ofPushMatrix();
-
-    ofTranslate(x, y);
-    ofRotateDeg(angle);
-    ofFill();
-
-    // Layer transparent shapes to create the glow.
-    for (int layer = 7; layer >= 1; --layer) {
-        const float radius = 3.0f + layer * 3.0f;
-
-        ofSetColor(
-            color.r, color.g, color.b,
-            opacity * 12.0f
-        );
-
-        ofDrawRectangle(
-            -radius, -bladeLength,
-            radius * 2.0f, bladeLength
-        );
-
-        ofDrawCircle(0, -bladeLength, radius);
-        ofDrawCircle(0, 0, radius);
-    }
-
-    // Colored blade.
-    ofSetColor(
-        color.r, color.g, color.b,
-        opacity * 240.0f
-    );
-
-    ofDrawRectangle(-5.0f, -bladeLength, 10.0f, bladeLength);
-    ofDrawCircle(0, -bladeLength, 5.0f);
-
-    // White core.
-    ofSetColor(255, 255, 255, opacity * 255.0f);
-    ofDrawRectangle(-2.0f, -bladeLength, 4.0f, bladeLength);
-    ofDrawCircle(0, -bladeLength, 2.0f);
-
-    // Metallic handle.
-    ofSetColor(65, 70, 80, opacity * 255.0f);
-    ofDrawRectangle(-10.0f, 0, 20.0f, 65.0f);
-
-    ofSetColor(165, 175, 190, opacity * 255.0f);
-    ofDrawRectangle(-7.0f, 3.0f, 4.0f, 57.0f);
-
-    // Grip bands.
-    ofSetColor(25, 28, 35, opacity * 255.0f);
-
-    for (int i = 0; i < 5; ++i) {
-        ofDrawRectangle(
-            -10.0f, 14.0f + i * 9.0f,
-            20.0f, 3.0f
-        );
-    }
-
-    // Blade emitter.
-    ofSetColor(195, 205, 220, opacity * 255.0f);
-    ofDrawRectangle(-12.0f, -4.0f, 24.0f, 9.0f);
-
-    ofPopMatrix();
-    ofPopStyle();
-}
-
-//SCENE 3: LASER SABER
+//  -- SCENE 3: --
+// Animation of a fight between two glowing lightsabers.
 void ofApp::drawSaberScene(float time) {
     const float localTime = time - saberStart;
 
@@ -919,6 +934,7 @@ void ofApp::drawSaberScene(float time) {
         18.0f * std::sin(localTime * 1.1f)
     );
 
+    // We use cosine to make the sabers swing towards each other and back.
     const float separation =
         0.5f * (1.0f - std::cos(PI * (localTime - 1.0f)));
 
@@ -950,7 +966,7 @@ void ofApp::drawSaberScene(float time) {
         opacity
     );
 
-    // The MP3 plays independently throughout this scene.
+    // We time the visual hits here; the MP3 plays independently.
     const int clash = static_cast<int>(
         std::floor((localTime + 1.0f) / 2.0f)
         );
@@ -984,6 +1000,7 @@ void ofApp::drawSaberScene(float time) {
             ofDrawCircle(0, 0, 11.0f * flash + 2.0f);
             ofSetLineWidth(2.0f);
 
+            // We add sparks to make the visual hits more noticeable.
             for (int i = 0; i < 16; ++i) {
                 const float angle =
                     TWO_PI * i / 16.0f + clash * 0.37f;
@@ -1016,7 +1033,8 @@ void ofApp::drawSaberScene(float time) {
     ofPopStyle();
 }
 
-//SCENE 4: CREDITS
+//  -- SCENE 4: --
+// We introduce the project and our names.
 void ofApp::drawScene4(float time) {
     drawParticles(
         fade(
@@ -1032,6 +1050,7 @@ void ofApp::drawScene4(float time) {
     std::string line2;
     float blockStart = creditsStart;
 
+    // We show the project name first, followed by our names.
     if (localTime < 5.0f) {
         line1 = "GENERATIVE AUDIOVISUAL";
         line2 = "M GROUP";
@@ -1091,8 +1110,8 @@ void ofApp::drawScene4(float time) {
     ofPopMatrix();
 }
 
-
-//SCENE 5: FINAL
+//  -- SCENE 5: -- 
+// We reveal the final title and fade to black.
 void ofApp::drawScene5(float time) {
     const float opacity = fade(
         time,
@@ -1104,6 +1123,7 @@ void ofApp::drawScene5(float time) {
 
     const float localTime = time - titleStart;
 
+    // We add a subtle pulse to keep the final title moving.
     const float pulse =
         1.0f + std::sin(localTime * 2.0f) * 0.02f;
 
