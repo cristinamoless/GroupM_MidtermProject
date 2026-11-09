@@ -657,7 +657,7 @@ void ofApp::drawCenteredText(const std::string& text,
 }
 
 
-
+//SCENE 1: INTRO
 void ofApp::drawScene1(float time) {
     drawStars(
         0.0f,
@@ -690,8 +690,7 @@ void ofApp::drawScene1(float time) {
     );
 }
 
-
-
+//SCENE 1.2: LIGHT VELOCITY
 void ofApp::drawScene2(float time) {
     const float trails = ofMap(
         time,
@@ -714,8 +713,7 @@ void ofApp::drawScene2(float time) {
     ofDrawRectangle(0, 0, ofGetWidth(), ofGetHeight());
 }
 
-
-
+//SCENE 2: PLANET AND SPACESHIPS
 void ofApp::drawScene3(float time) {
     const float localTime = time - planetStart;
 
@@ -891,7 +889,7 @@ void ofApp::drawLightsaber(float x, float y,
     ofPopStyle();
 }
 
-
+//SCENE 3: LASER SABER
 void ofApp::drawSaberScene(float time) {
     const float localTime = time - saberStart;
 
@@ -1018,7 +1016,7 @@ void ofApp::drawSaberScene(float time) {
     ofPopStyle();
 }
 
-
+//SCENE 4: CREDITS
 void ofApp::drawScene4(float time) {
     drawParticles(
         fade(
@@ -1094,7 +1092,7 @@ void ofApp::drawScene4(float time) {
 }
 
 
-
+//SCENE 5: FINAL
 void ofApp::drawScene5(float time) {
     const float opacity = fade(
         time,
