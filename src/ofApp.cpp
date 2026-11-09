@@ -2,9 +2,6 @@
 #include <algorithm>
 #include <cmath>
 
-// ============================================================
-// STARS
-// ============================================================
 
 void Star::reset(float width, float height,
     float depth, bool randomDepth) {
@@ -83,9 +80,6 @@ void Star::draw(float trails, float alpha) {
     ofSetLineWidth(1.0f);
 }
 
-// ============================================================
-// PARTICLES
-// ============================================================
 
 void Particle::setup() {
     pos.set(ofRandomWidth(), ofRandomHeight());
@@ -126,9 +120,7 @@ void Particle::draw(float opacity) {
     ofDrawCircle(pos.x, pos.y, radius);
 }
 
-// ============================================================
-// SETUP
-// ============================================================
+
 
 void ofApp::setup() {
     ofSetFrameRate(60);
@@ -252,9 +244,7 @@ void ofApp::setupShips() {
     }
 }
 
-// ============================================================
-// UPDATE
-// ============================================================
+
 
 void ofApp::update() {
     ofSoundUpdate();
@@ -408,9 +398,7 @@ void ofApp::updateSaberAudio() {
     }
 }
 
-// ============================================================
-// GENERATIVE SPACESHIP AUDIO
-// ============================================================
+
 
 void ofApp::audioOut(ofSoundBuffer& buffer) {
     // Clear the underlying sample vector.
@@ -525,9 +513,7 @@ void ofApp::audioOut(ofSoundBuffer& buffer) {
     }
 }
 
-// ============================================================
-// DRAW AND CLEANUP
-// ============================================================
+
 
 void ofApp::draw() {
     ofBackground(0);
@@ -573,9 +559,7 @@ void ofApp::exit() {
     if (saberAudioLoaded) saberAudio.stop();
 }
 
-// ============================================================
-// HELPERS
-// ============================================================
+
 
 float ofApp::fade(float time, float begin, float fadeInEnd,
     float fadeOutBegin, float end) {
@@ -672,9 +656,7 @@ void ofApp::drawCenteredText(const std::string& text,
     ofPopMatrix();
 }
 
-// ============================================================
-// SILENT INTRODUCTION — 0 TO 12 SECONDS
-// ============================================================
+
 
 void ofApp::drawScene1(float time) {
     drawStars(
@@ -708,9 +690,7 @@ void ofApp::drawScene1(float time) {
     );
 }
 
-// ============================================================
-// HYPERSPACE — 12 TO 25 SECONDS
-// ============================================================
+
 
 void ofApp::drawScene2(float time) {
     const float trails = ofMap(
@@ -734,9 +714,7 @@ void ofApp::drawScene2(float time) {
     ofDrawRectangle(0, 0, ofGetWidth(), ofGetHeight());
 }
 
-// ============================================================
-// PLANET AND SPACESHIPS — 25 TO 50 SECONDS
-// ============================================================
+
 
 void ofApp::drawScene3(float time) {
     const float localTime = time - planetStart;
@@ -844,9 +822,7 @@ void ofApp::drawScene3(float time) {
     ofDrawRectangle(0, 0, width, height);
 }
 
-// ============================================================
-// LIGHTSABER DRAWING
-// ============================================================
+
 
 void ofApp::drawLightsaber(float x, float y,
     float angle, float bladeLength,
@@ -915,9 +891,6 @@ void ofApp::drawLightsaber(float x, float y,
     ofPopStyle();
 }
 
-// ============================================================
-// LIGHTSABER COMBAT — 50 TO 65 SECONDS
-// ============================================================
 
 void ofApp::drawSaberScene(float time) {
     const float localTime = time - saberStart;
@@ -979,7 +952,6 @@ void ofApp::drawSaberScene(float time) {
         opacity
     );
 
-    // Visual impacts remain part of the animation.
     // The MP3 plays independently throughout this scene.
     const int clash = static_cast<int>(
         std::floor((localTime + 1.0f) / 2.0f)
@@ -1046,9 +1018,6 @@ void ofApp::drawSaberScene(float time) {
     ofPopStyle();
 }
 
-// ============================================================
-// CREDITS — 65 TO 80 SECONDS
-// ============================================================
 
 void ofApp::drawScene4(float time) {
     drawParticles(
@@ -1124,9 +1093,7 @@ void ofApp::drawScene4(float time) {
     ofPopMatrix();
 }
 
-// ============================================================
-// FINAL TITLE — 80 TO 95 SECONDS
-// ============================================================
+
 
 void ofApp::drawScene5(float time) {
     const float opacity = fade(
