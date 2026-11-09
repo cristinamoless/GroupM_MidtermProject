@@ -1,4 +1,9 @@
+# Ignore Visual Studio temporary files.
 .vs/
-[Bb]in/
-![Bb]bin/data
-[Oo]bj
+
+# Ignore build output, but keep the data folder.
+/[Bb]in/*
+!/[Bb]in/data/
+
+# Ignore intermediate compilation files.
+[Oo]bj/
