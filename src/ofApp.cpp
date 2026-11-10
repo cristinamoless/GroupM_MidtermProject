@@ -5,6 +5,18 @@
 // We wanted to create a space intro inspired by Star Wars.
 // We used code for the visuals and audio files for the music and saber scene.
 
+// We used ChatGPT as a support tool throughout the development of the project, 
+// mainly to clarify questions about specific lines of code and to help us 
+// understand how to implement certain features in order to achieve our goals. 
+// It was especially used for refining the trigonometric equations for lightsaber 
+// contact angles, spark line distribution, and perspective projection math for the starfield. 
+// However, it is important to emphasize that we maintained full control over the 
+// development process at all times and that the final work is entirely our own.
+// Rather than simply copying AI - generated responses, we used them as a reference 
+// to better understand the code, evaluate different approaches, and make our own decisions.
+// This allowed us to learn throughout the process while ensuring that the final result 
+// reflected our own understanding, effort, and creativity.
+
 void Star::reset(float width, float height,
     float depth, bool randomDepth) {
     maxDepth = depth;
